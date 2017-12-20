@@ -16,4 +16,5 @@ public class ConstantPool {
 //    public static final String APP_KEY = "a0927149-bfd5-40cc-824e-a110b0847c6e";
 
     public static final String AI = BASE_URL + "in/general!ai";
+
 }

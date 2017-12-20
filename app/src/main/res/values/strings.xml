@@ -1,5 +1,7 @@
 <resources>
     <string name="app_name">LierDaFridge</string>
+    <string name="app_id">5a17be57</string>
     <!-- 听写 -->
     <string name="text_begin">请开始说话…</string>
+
 </resources>

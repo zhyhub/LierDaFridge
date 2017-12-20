@@ -93,17 +93,25 @@ public class ControlService extends AccessibilityService {
     private ZigbeeBean.AttributesBean attributesBean = new ZigbeeBean.AttributesBean();
 
     @Override
+    protected void onServiceConnected() {
+        super.onServiceConnected();
+    }
+
+    @Override
     public void onCreate() {
         super.onCreate();
         createSocket();
         audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
-        // 初始化识别无UI识别对象
+//        // 初始化识别无UI识别对象
         // 使用SpeechRecognizer对象，可根据回调消息自定义界面；
         mIat = SpeechRecognizer.createRecognizer(ControlService.this, mInitListener);
         mTts = SpeechSynthesizer.createSynthesizer(ControlService.this, mTtsInitListener);
         // 设置参数
         setTtsParam();
         initUart();
+        audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+        assert audioManager != null;
+        L.e(TAG, "当前音量    " + audioManager.getStreamVolume(AudioManager.STREAM_MUSIC) + "  最大音量  " + audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC));
 
         if (receiver == null) {
             receiver = new NetWorkStateReceiver();
@@ -111,12 +119,14 @@ public class ControlService extends AccessibilityService {
         IntentFilter filter = new IntentFilter();
         filter.addAction(ConnectivityManager.CONNECTIVITY_ACTION);
         registerReceiver(receiver, filter);
+
+        L.e(TAG, "ControlService ControlService ControlService ControlService");
     }
 
     @Override
     public void onDestroy() {
-        Intent sevice = new Intent(this, ControlService.class);
-        this.startService(sevice);
+        Intent service = new Intent(this, ControlService.class);
+        this.startService(service);
         closeSocket();
         unregisterReceiver(receiver);
         super.onDestroy();
@@ -126,22 +136,21 @@ public class ControlService extends AccessibilityService {
      * 讯飞唤醒监听
      *
      * @param event 监听事件
-     * @return
      */
     @Override
     protected boolean onKeyEvent(KeyEvent event) {
+        Log.v(TAG, "onKeyEvent");
         switch (event.getKeyCode()) {
             case KeyEvent.KEYCODE_F1:
                 //接受到f1信号，设备已经被唤醒，调用讯飞语音识别
                 L.e(TAG, "接受到f1信号，设备已经被唤醒，调用讯飞语音识别");
-
                 if (mTts.isSpeaking()) {
                     mTts.stopSpeaking();
                 }
                 if (mIat.isListening()) {
                     mIat.stopListening();
                 }
-                int code = mTts.startSpeaking("我在，您说", mTtsListener);
+                int code = mTts.startSpeaking("你要说什么", mTtsListener);
                 /*
                  * 只保存音频不进行播放接口,调用此接口请注释startSpeaking接口
 		         * text:要合成的文本，uri:需要保存的音频全路径，listener:回调接口
@@ -394,7 +403,6 @@ public class ControlService extends AccessibilityService {
 
 //=============================================================  下面是监听wifi连接情况  ======================================================================================================
 
-
     private static boolean isWifiConnected(Context context) {
         ConnectivityManager connectivityManager = (ConnectivityManager) context.getSystemService(CONNECTIVITY_SERVICE);
         assert connectivityManager != null;
@@ -407,7 +415,7 @@ public class ControlService extends AccessibilityService {
         public void onReceive(Context context, Intent intent) {
             L.e("网络状态发生变化");
             if (isWifiConnected(ControlService.this)) {
-                mTts.startSpeaking("网络连接成功", mTtsListener);
+                mTts.startSpeaking("网络连接成功了了了了了", mTtsListener);
             } else {
                 mTts.startSpeaking("网络连接已断开", mTtsListener);
             }
@@ -417,12 +425,12 @@ public class ControlService extends AccessibilityService {
 
 //=============================================================  下面是请求海知语音获取意图 并做相应的指令操作 ======================================================================================================
 
-    private void sendMsg(String txt, int currentVolume, final int attributesBeanVolume) {
-        L.e(TAG, "  sendMsg   " + "   currentVolume   " + currentVolume + "   attributesBeanVolume   " + attributesBeanVolume);
+    private void sendMsg(String txt, int currentVolume, final int maxVolume) {
+        L.e(TAG, "  sendMsg   " + "   currentVolume   " + currentVolume + "   maxVolume   " + maxVolume);
         BaseOkHttpClient.newBuilder()
                 .addParam("q", txt)
                 .addParam("currentVolume", currentVolume)
-                .addParam("attributesBeanVolume", attributesBeanVolume)
+                .addParam("maxVolume", maxVolume)
                 .addParam("data", Arrays.toString(new byte[48]))
                 .addParam("user_id", "123456")
                 .addParam("refrigeratorId", "1")
@@ -685,6 +693,7 @@ public class ControlService extends AccessibilityService {
         mSignwayManager = SignwayManager.getInstatnce();
         if (fid < 0) {
             fid = mSignwayManager.openUart("dev/ttyS2", 9600);
+
         }
 
 //        nfcHandler = new Handler();
