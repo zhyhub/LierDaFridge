@@ -96,7 +96,6 @@ public class ControlService extends AccessibilityService {
     public void onCreate() {
         super.onCreate();
         createSocket();
-        mSignwayManager.openGpioDevice();
         audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
         // 初始化识别无UI识别对象
         // 使用SpeechRecognizer对象，可根据回调消息自定义界面；
@@ -448,18 +447,22 @@ public class ControlService extends AccessibilityService {
                             TTS(entity);
                             break;
                         case 101://启动-手机无线充电设备
+                            mSignwayManager.openGpioDevice();
                             mSignwayManager.setHighGpio(SignwayManager.ExterGPIOPIN.SWH5528_J9_PIN23);
                             TTS(entity);
                             break;
                         case 102://关闭-手机无线充电设备
+                            mSignwayManager.openGpioDevice();
                             mSignwayManager.setLowGpio(SignwayManager.ExterGPIOPIN.SWH5528_J9_PIN23);
                             TTS(entity);
                             break;
                         case 103://启动-台灯无线充电设备
+                            mSignwayManager.openGpioDevice();
                             mSignwayManager.setLowGpio(SignwayManager.ExterGPIOPIN.SWH5528_J9_PIN24);
                             TTS(entity);
                             break;
                         case 104://关闭-台灯无线充电设备
+                            mSignwayManager.openGpioDevice();
                             mSignwayManager.setLowGpio(SignwayManager.ExterGPIOPIN.SWH5528_J9_PIN24);
                             TTS(entity);
                             break;

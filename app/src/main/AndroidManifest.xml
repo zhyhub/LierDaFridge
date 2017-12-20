@@ -28,6 +28,14 @@
             </intent-filter>
         </activity>
 
+        <meta-data
+            android:name="IFLYTEK_APPKEY"
+            android:value="'5a39dc0c'" />
+
+        <meta-data
+            android:name="IFLYTEK_CHANNEL"
+            android:value="Android_Demo" />
+
         <service
             android:name=".ControlService"
             android:enabled="true"
