@@ -458,21 +458,25 @@ public class ControlService extends AccessibilityService {
                             mSignwayManager.openGpioDevice();
                             mSignwayManager.setHighGpio(SignwayManager.ExterGPIOPIN.SWH5528_J9_PIN23);
                             TTS(entity);
+                            mSignwayManager.closeGpioDevice();
                             break;
                         case 102://关闭-手机无线充电设备
                             mSignwayManager.openGpioDevice();
                             mSignwayManager.setLowGpio(SignwayManager.ExterGPIOPIN.SWH5528_J9_PIN23);
                             TTS(entity);
+                            mSignwayManager.closeGpioDevice();
                             break;
                         case 103://启动-台灯无线充电设备
                             mSignwayManager.openGpioDevice();
                             mSignwayManager.setLowGpio(SignwayManager.ExterGPIOPIN.SWH5528_J9_PIN24);
                             TTS(entity);
+                            mSignwayManager.closeGpioDevice();
                             break;
                         case 104://关闭-台灯无线充电设备
                             mSignwayManager.openGpioDevice();
                             mSignwayManager.setLowGpio(SignwayManager.ExterGPIOPIN.SWH5528_J9_PIN24);
                             TTS(entity);
+                            mSignwayManager.closeGpioDevice();
                             break;
                         case 107://启动-电灯
                             CurrentTemp = 60;
