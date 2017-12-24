@@ -127,6 +127,9 @@ public class ControlService extends AccessibilityService {
     public void onDestroy() {
         Intent service = new Intent(this, ControlService.class);
         this.startService(service);
+        phoneHandler.removeCallbacks(phoneRunnable);//停止指令
+        lampHandler.removeCallbacks(lampRunnable);//停止指令
+        volumeHandler.removeCallbacks(volumeRunnable);//停止指令
         closeSocket();
         unregisterReceiver(receiver);
         super.onDestroy();
@@ -690,8 +693,25 @@ public class ControlService extends AccessibilityService {
     private OutputStream outputStream;
     private static final int MSG_SOCKET = 1234;
 
-    private Handler nfcHandler;
-    private Runnable nfcUpdate;
+    private Handler volumeHandler = null;
+    private Runnable volumeRunnable = null;
+
+    private Handler phoneHandler = null;
+    private Runnable phoneRunnable = null;
+
+    private Handler lampHandler = null;
+    private Runnable lampRunnable = null;
+
+    private boolean isSet = false;
+    int MAX_SIZE = 3;
+    byte[] rbuf = new byte[MAX_SIZE];
+    private byte[] sendData = new byte[3];//读的数据
+
+    private boolean volumeUp = false;
+    private boolean volumeDown = false;
+
+    private boolean wifiPhone = false;
+    private boolean wifiLamp = false;
 
     private void initUart() {
         mSignwayManager = SignwayManager.getInstatnce();
@@ -700,20 +720,118 @@ public class ControlService extends AccessibilityService {
 
         }
 
-//        nfcHandler = new Handler();
-//        nfcUpdate = new Runnable() {
-//            @Override
-//            public void run() {
-//                mSignwayManager.openGpioDevice();
-//                //配置SWH5528_J9_PIN1,对应GPIO2_A6
-//                mSignwayManager.setGpioNum(SignwayManager.ExterGPIOPIN.SWH5528_J9_PIN24,
-//                        SignwayManager.GPIOGroup.GPIO0, SignwayManager.GPIONum.PD2);
-//                int state = mSignwayManager.getGpioStatus(SignwayManager.ExterGPIOPIN.SWH5528_J9_PIN24);
-//                L.e(TAG, "  state  : " + state);
-//                nfcHandler.postDelayed(nfcUpdate, 500);
-//            }
-//        };
-//        nfcHandler.post(nfcUpdate);
+        volumeHandler = new Handler();
+        volumeRunnable = new Runnable() {
+            @Override
+            public void run() {
+                L.e(TAG, "读 音量");
+                readDevice();
+                volumeHandler.postDelayed(volumeRunnable, 500);
+            }
+        };
+        volumeHandler.post(volumeRunnable);
+
+        phoneHandler = new Handler();
+        phoneRunnable = new Runnable() {
+            @Override
+            public void run() {
+                mSignwayManager.openGpioDevice();
+                mSignwayManager.setGpioNum(SignwayManager.ExterGPIOPIN.SWH5528_J9_PIN23
+                        , SignwayManager.GPIOGroup.GPIO0, SignwayManager.GPIONum.PD4);
+                int state = mSignwayManager.getGpioStatus(SignwayManager.ExterGPIOPIN.SWH5528_J9_PIN23);
+                if (state == 1 && !wifiPhone) {
+                    L.e(TAG, "按键打开无线手机充电");
+                    mSignwayManager.setHighGpio(SignwayManager.ExterGPIOPIN.SWH5528_J9_PIN23);
+                    wifiPhone = true;
+                } else if (state == 0) {
+                    L.e(TAG, "按键关闭无线手机充电");
+                    mSignwayManager.setLowGpio(SignwayManager.ExterGPIOPIN.SWH5528_J9_PIN23);
+                    wifiPhone = false;
+                }
+                phoneHandler.postDelayed(phoneRunnable, 500);
+            }
+        };
+        phoneHandler.post(phoneRunnable);
+
+        lampHandler = new Handler();
+        lampRunnable = new Runnable() {
+            @Override
+            public void run() {
+                mSignwayManager.openGpioDevice();
+                mSignwayManager.setGpioNum(SignwayManager.ExterGPIOPIN.SWH5528_J9_PIN24
+                        , SignwayManager.GPIOGroup.GPIO0, SignwayManager.GPIONum.PD2);
+                int state = mSignwayManager.getGpioStatus(SignwayManager.ExterGPIOPIN.SWH5528_J9_PIN24);
+                if (state == 1 && !wifiLamp) {
+                    L.e(TAG, "按键打开无线台灯");
+                    mSignwayManager.setHighGpio(SignwayManager.ExterGPIOPIN.SWH5528_J9_PIN24);
+                    wifiLamp = true;
+                } else if (state == 0) {
+                    L.e(TAG, "按键关闭无线台灯");
+                    mSignwayManager.setLowGpio(SignwayManager.ExterGPIOPIN.SWH5528_J9_PIN24);
+                    wifiLamp = false;
+                }
+                lampHandler.postDelayed(lampRunnable, 500);
+            }
+        };
+        lampHandler.post(lampRunnable);
+    }
+
+    private void readDevice() {
+        if (fid < 0) {
+            return;
+        }
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                if (!isSet) {
+                    isSet = true;
+                    readLength = mSignwayManager.readUart(fid, rbuf, rbuf.length);
+                    if (readLength > 3) {
+                        setNewData(rbuf, readLength);
+                    }
+                    isSet = false;
+                }
+            }
+        });
+    }
+
+    private void setNewData(byte[] newData, int readLength) {
+        if (newData != null && readLength > 0) {
+            int i = 0;
+            while ((newData[i] != 0x55) && (newData[i + 2] != 0xAA)) {
+                i++;
+                if (i > (readLength - 1)) {
+                    return;
+                }
+            }
+
+            for (int j = 0; j < 3; j++) {
+                sendData[j] = newData[i];
+                i++;
+                if (i > (readLength - 1)) {
+                    return;
+                }
+            }
+            L.e(TAG, Arrays.toString(sendData));
+
+            byte MODE = sendData[1];
+
+            if ((MODE & 0xA2) != 0 && !volumeUp) {
+                L.e(TAG, "按键音量增加");
+                volumeUp = true;
+                if (audioManager.getStreamVolume(AudioManager.STREAM_MUSIC) < audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)) {
+                    audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, audioManager.getStreamVolume(AudioManager.STREAM_MUSIC) + 1, 0);
+                }
+            } else if ((MODE & 0xA2) == 0) {
+                volumeUp = false;
+            } else if ((MODE & 0xA3) != 0 && !volumeDown) {
+                L.e(TAG, "按键音量减少");
+                volumeDown = true;
+                audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, audioManager.getStreamVolume(AudioManager.STREAM_MUSIC) - 1, 0);
+            } else if ((MODE & 0xA3) == 0) {
+                volumeDown = false;
+            }
+        }
     }
 
     protected void createSocket() {
