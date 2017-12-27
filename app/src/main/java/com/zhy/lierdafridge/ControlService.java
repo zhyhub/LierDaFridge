@@ -435,8 +435,8 @@ public class ControlService extends AccessibilityService {
                 .addParam("currentVolume", currentVolume)
                 .addParam("maxVolume", maxVolume)
                 .addParam("data", Arrays.toString(new byte[48]))
-                .addParam("user_id", "123456")
-                .addParam("refrigeratorId", "1")
+                .addParam("user_id", ConstantPool.UserID)
+                .addParam("refrigeratorId", ConstantPool.FridgeId)
                 .get()
                 .url(ConstantPool.AI)
                 .build().enqueue(new BaseCallBack() {

@@ -1,8 +1,15 @@
 package com.zhy.lierdafridge;
 
 import android.app.Application;
+import android.content.ComponentName;
+import android.content.Context;
+import android.provider.Settings;
+import android.text.TextUtils;
 
 import com.iflytek.cloud.SpeechUtility;
+import com.zhy.lierdafridge.utils.L;
+
+import static android.content.ContentValues.TAG;
 
 /**
  * Created by Administrator on 2017/12/20 0020.
@@ -22,5 +29,25 @@ public class MyApplication extends Application {
         // 以下语句用于设置日志开关（默认开启），设置成false时关闭语音云SDK日志打印
         // Setting.setShowLog(false);
         super.onCreate();
+
+        startAccessibilityService(MyApplication.this);
+    }
+
+    private void startAccessibilityService(Context context) {
+        L.e(TAG, "startAccessibilityService() called");
+        String enabledServicesSetting = Settings.Secure.getString(context.getContentResolver(), Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
+        L.e(TAG, "enabledServicesSetting: " + enabledServicesSetting);
+        ComponentName selfComponentName = new ComponentName(context.getPackageName(), ControlService.class.getName());
+        String flattenToString = selfComponentName.flattenToString();
+        L.e(TAG, "flattenToString: " + flattenToString);
+        if (enabledServicesSetting == null || !enabledServicesSetting.contains(flattenToString)) {
+            if (TextUtils.isEmpty(enabledServicesSetting) || TextUtils.equals(enabledServicesSetting, "null")) {
+                enabledServicesSetting = flattenToString;
+            } else {
+                enabledServicesSetting += flattenToString;
+            }
+        }
+        Settings.Secure.putString(context.getContentResolver(), Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES, enabledServicesSetting);
+        Settings.Secure.putInt(context.getContentResolver(), Settings.Secure.ACCESSIBILITY_ENABLED, 1);
     }
 }
