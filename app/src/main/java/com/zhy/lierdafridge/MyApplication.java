@@ -9,13 +9,15 @@ import android.text.TextUtils;
 import com.iflytek.cloud.SpeechUtility;
 import com.zhy.lierdafridge.utils.L;
 
+import org.litepal.LitePalApplication;
+
 import static android.content.ContentValues.TAG;
 
 /**
  * Created by Administrator on 2017/12/20 0020.
  */
 
-public class MyApplication extends Application {
+public class MyApplication extends LitePalApplication {
     @Override
     public void onCreate() {
         // 应用程序入口处调用，避免手机内存过小，杀死后台进程后通过历史intent进入Activity造成SpeechUtility对象为null

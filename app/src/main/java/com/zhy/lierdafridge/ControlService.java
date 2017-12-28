@@ -30,7 +30,10 @@ import com.iflytek.cloud.SpeechSynthesizer;
 import com.iflytek.cloud.SynthesizerListener;
 import com.signway.SignwayManager;
 import com.zhy.lierdafridge.bean.BaseEntity;
+import com.zhy.lierdafridge.bean.RemindBean;
+import com.zhy.lierdafridge.bean.Song;
 import com.zhy.lierdafridge.bean.ZigbeeBean;
+import com.zhy.lierdafridge.player.MusicPlayer;
 import com.zhy.lierdafridge.utils.BaseCallBack;
 import com.zhy.lierdafridge.utils.BaseOkHttpClient;
 import com.zhy.lierdafridge.utils.JsonParser;
@@ -38,6 +41,7 @@ import com.zhy.lierdafridge.utils.L;
 
 import org.json.JSONException;
 import org.json.JSONObject;
+import org.litepal.crud.DataSupport;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -45,9 +49,11 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.Socket;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -60,6 +66,10 @@ import okhttp3.Call;
 public class ControlService extends AccessibilityService {
 
     private static String TAG = ControlService.class.getSimpleName();
+
+    //行程提醒广播
+    private AlarmReceiver alarmReceiver;
+    private int requestCode = 0;
 
     // 语音听写对象
     private SpeechRecognizer mIat;
@@ -89,6 +99,9 @@ public class ControlService extends AccessibilityService {
      */
     private AudioManager audioManager;
 
+    AlarmManager am;
+    private boolean isPause = false;
+
     private ZigbeeBean zigbeeBean;
     private ZigbeeBean.AttributesBean attributesBean = new ZigbeeBean.AttributesBean();
 
@@ -102,6 +115,8 @@ public class ControlService extends AccessibilityService {
         super.onCreate();
         createSocket();
         audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+        alarmReceiver = new AlarmReceiver();
+        registerReceiver(alarmReceiver, new IntentFilter("com.zhy.lierdafridge.RING"));
 //        // 初始化识别无UI识别对象
         // 使用SpeechRecognizer对象，可根据回调消息自定义界面；
         mIat = SpeechRecognizer.createRecognizer(ControlService.this, mInitListener);
@@ -112,6 +127,22 @@ public class ControlService extends AccessibilityService {
         audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
         assert audioManager != null;
         L.e(TAG, "当前音量    " + audioManager.getStreamVolume(AudioManager.STREAM_MUSIC) + "  最大音量  " + audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC));
+
+        DataSupport.deleteAll(RemindBean.class, "triggerAtMillis<?", String.valueOf(System.currentTimeMillis()));
+
+        List<RemindBean> remindBeanList = DataSupport.select("triggerAtMillis").where("triggerAtMillis >= ?", String.valueOf(System.currentTimeMillis())).find(RemindBean.class);
+
+        if (remindBeanList.size() > 0) {
+            for (RemindBean remindBean : remindBeanList) {
+                Intent intent = new Intent();
+                intent.setAction("smartlink.zhy.jyfridge.RING");
+                intent.putExtra("time", remindBean.getTriggerAtMillis());
+                PendingIntent pendingIntent = PendingIntent.getBroadcast(ControlService.this, requestCode, intent, 0);
+                am.set(AlarmManager.RTC_WAKEUP, remindBean.getTriggerAtMillis(), pendingIntent);
+                requestCode++;
+            }
+            L.e(TAG, "还有没有过期的日程提醒");
+        }
 
         if (receiver == null) {
             receiver = new NetWorkStateReceiver();
@@ -125,11 +156,13 @@ public class ControlService extends AccessibilityService {
 
     @Override
     public void onDestroy() {
+        unregisterReceiver(alarmReceiver);
         Intent service = new Intent(this, ControlService.class);
         this.startService(service);
         phoneHandler.removeCallbacks(phoneRunnable);//停止指令
         lampHandler.removeCallbacks(lampRunnable);//停止指令
         volumeHandler.removeCallbacks(volumeRunnable);//停止指令
+        requestCode = 0;
         closeSocket();
         unregisterReceiver(receiver);
         super.onDestroy();
@@ -145,13 +178,20 @@ public class ControlService extends AccessibilityService {
         Log.v(TAG, "onKeyEvent");
         switch (event.getKeyCode()) {
             case KeyEvent.KEYCODE_F1:
-                //接受到f1信号，设备已经被唤醒，调用讯飞语音识别
-                L.e(TAG, "接受到f1信号，设备已经被唤醒，调用讯飞语音识别");
                 if (mTts.isSpeaking()) {
                     mTts.stopSpeaking();
                 }
                 if (mIat.isListening()) {
                     mIat.stopListening();
+                }
+
+                //接受到f1信号，设备已经被唤醒，调用讯飞语音识别
+                L.e(TAG, "接受到f1信号，设备已经被唤醒，调用讯飞语音识别");
+
+                if (MusicPlayer.getPlayer().isPlaying()) {
+                    MusicPlayer.getPlayer().pause();
+                    isPause = true;
+                    L.e(TAG, "onKeyEvent  播放睡前故事暂停");
                 }
                 int code = mTts.startSpeaking("你要说什么", mTtsListener);
                 /*
@@ -344,12 +384,24 @@ public class ControlService extends AccessibilityService {
             // 错误码：10118(您没有说话)，可能是录音机权限被禁，需要提示用户打开应用的录音权限。
             // 如果使用本地功能（语记）需要提示用户开启语记的录音权限。
             showTip(error.getPlainDescription(true));
+            mSignwayManager.setLowGpio(SignwayManager.ExterGPIOPIN.SWH5528_J9_PIN23);
+            if (isPause) {
+                MusicPlayer.getPlayer().resume();
+                isPause = false;
+                L.e(TAG, "onCompleted  播放睡前故事恢复播放");
+            }
         }
 
         @Override
         public void onEndOfSpeech() {
             // 此回调表示：检测到了语音的尾端点，已经进入识别过程，不再接受语音输入
             showTip("结束说话");
+            mSignwayManager.setLowGpio(SignwayManager.ExterGPIOPIN.SWH5528_J9_PIN23);
+            if (isPause) {
+                MusicPlayer.getPlayer().resume();
+                isPause = false;
+                L.e(TAG, "onCompleted  播放睡前故事恢复播放");
+            }
         }
 
         @Override
@@ -428,6 +480,12 @@ public class ControlService extends AccessibilityService {
 
 //=============================================================  下面是请求海知语音获取意图 并做相应的指令操作 ======================================================================================================
 
+    private Song getSong(String url) {
+        Song song = new Song();
+        song.setPath(url);
+        return song;
+    }
+
     private void sendMsg(String txt, int currentVolume, final int maxVolume) {
         L.e(TAG, "  sendMsg   " + "   currentVolume   " + currentVolume + "   maxVolume   " + maxVolume);
         BaseOkHttpClient.newBuilder()
@@ -457,26 +515,83 @@ public class ControlService extends AccessibilityService {
                             audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, entity.getVolume(), 0);
                             TTS(entity);
                             break;
+                        case 3://日程提醒
+                            RemindBean remindBean = new RemindBean();
+                            remindBean.setTriggerAtMillis(entity.getTime_start());
+                            remindBean.setMsg(entity.getDetails());
+                            remindBean.save();
+                            if (remindBean.save()) {
+                                L.e(TAG, "Connector   存储成功");
+                            } else {
+                                L.e(TAG, "Connector   存储失败");
+                            }
+                            Intent intent = new Intent();
+                            intent.setAction("smartlink.zhy.jyfridge.RING");
+                            intent.putExtra("time", entity.getTime_start());
+                            PendingIntent pendingIntent = PendingIntent.getBroadcast(ControlService.this, requestCode, intent, 0);
+                            am.set(AlarmManager.RTC_WAKEUP, entity.getTime_start(), pendingIntent);
+                            requestCode++;
+                            if ("".equals(entity.getDetails())) {
+                                TTS(entity);
+                            }
+                            break;
+                        case 4://获取睡前故事url
+                            TTS(entity);
+                            if (entity.getUrl() != null && !"".equals(entity.getUrl())) {
+                                List<Song> queue = new ArrayList<>();
+                                queue.add(getSong(entity.getUrl().replace("\\", "")));
+                                MusicPlayer.getPlayer().setQueue(queue, 0);
+                                L.e(TAG, "sendMsg  播放睡前故事播放" + entity.getUrl().replace("\\", ""));
+                                if (mTts.isSpeaking()) mTts.stopSpeaking();
+                                if (mIat.isListening()) mIat.stopListening();
+                                isPause = true;
+                            }
+                            break;
+                        case 5://暂停
+                            L.e(TAG, "sendMsg  播放睡前故事暂停");
+                            MusicPlayer.getPlayer().pause();
+                            TTS(entity);
+                            isPause = false;
+                            break;
+                        case 6://恢复播放
+                            L.e(TAG, "sendMsg  播放睡前故事恢复播放");
+                            MusicPlayer.getPlayer().resume();
+                            isPause = false;
+                            break;
+                        case 7://停止
+                            L.e(TAG, "sendMsg  播放睡前故事停止播放");
+                            MusicPlayer.getPlayer().stop();
+                            TTS(entity);
+                            isPause = false;
+                            break;
                         case 101://启动-手机无线充电设备
                             mSignwayManager.openGpioDevice();
+                            mSignwayManager.setGpioNum(SignwayManager.ExterGPIOPIN.SWH5528_J9_PIN23
+                                    , SignwayManager.GPIOGroup.GPIO0, SignwayManager.GPIONum.PD4);
                             mSignwayManager.setHighGpio(SignwayManager.ExterGPIOPIN.SWH5528_J9_PIN23);
                             TTS(entity);
                             mSignwayManager.closeGpioDevice();
                             break;
                         case 102://关闭-手机无线充电设备
                             mSignwayManager.openGpioDevice();
+                            mSignwayManager.setGpioNum(SignwayManager.ExterGPIOPIN.SWH5528_J9_PIN23
+                                    , SignwayManager.GPIOGroup.GPIO0, SignwayManager.GPIONum.PD4);
                             mSignwayManager.setLowGpio(SignwayManager.ExterGPIOPIN.SWH5528_J9_PIN23);
                             TTS(entity);
                             mSignwayManager.closeGpioDevice();
                             break;
                         case 103://启动-台灯无线充电设备
                             mSignwayManager.openGpioDevice();
-                            mSignwayManager.setLowGpio(SignwayManager.ExterGPIOPIN.SWH5528_J9_PIN24);
+                            mSignwayManager.setGpioNum(SignwayManager.ExterGPIOPIN.SWH5528_J9_PIN24
+                                    , SignwayManager.GPIOGroup.GPIO0, SignwayManager.GPIONum.PD2);
+                            mSignwayManager.setHighGpio(SignwayManager.ExterGPIOPIN.SWH5528_J9_PIN24);
                             TTS(entity);
                             mSignwayManager.closeGpioDevice();
                             break;
                         case 104://关闭-台灯无线充电设备
                             mSignwayManager.openGpioDevice();
+                            mSignwayManager.setGpioNum(SignwayManager.ExterGPIOPIN.SWH5528_J9_PIN24
+                                    , SignwayManager.GPIOGroup.GPIO0, SignwayManager.GPIONum.PD2);
                             mSignwayManager.setLowGpio(SignwayManager.ExterGPIOPIN.SWH5528_J9_PIN24);
                             TTS(entity);
                             mSignwayManager.closeGpioDevice();
@@ -703,15 +818,9 @@ public class ControlService extends AccessibilityService {
     private Runnable lampRunnable = null;
 
     private boolean isSet = false;
-    int MAX_SIZE = 3;
+    int MAX_SIZE = 20;
     byte[] rbuf = new byte[MAX_SIZE];
-    private byte[] sendData = new byte[3];//读的数据
-
-    private boolean volumeUp = false;
-    private boolean volumeDown = false;
-
-    private boolean wifiPhone = false;
-    private boolean wifiLamp = false;
+    private byte[] sendData = new byte[5];//读的数据
 
     private void initUart() {
         mSignwayManager = SignwayManager.getInstatnce();
@@ -719,80 +828,71 @@ public class ControlService extends AccessibilityService {
             fid = mSignwayManager.openUart("dev/ttyS2", 9600);
 
         }
-
         volumeHandler = new Handler();
         volumeRunnable = new Runnable() {
             @Override
             public void run() {
                 L.e(TAG, "读 音量");
                 readDevice();
-                volumeHandler.postDelayed(volumeRunnable, 500);
+                volumeHandler.postDelayed(volumeRunnable, 100);
             }
         };
         volumeHandler.post(volumeRunnable);
 
-        phoneHandler = new Handler();
-        phoneRunnable = new Runnable() {
-            @Override
-            public void run() {
-                mSignwayManager.openGpioDevice();
-                mSignwayManager.setGpioNum(SignwayManager.ExterGPIOPIN.SWH5528_J9_PIN23
-                        , SignwayManager.GPIOGroup.GPIO0, SignwayManager.GPIONum.PD4);
-                int state = mSignwayManager.getGpioStatus(SignwayManager.ExterGPIOPIN.SWH5528_J9_PIN23);
-                if (state == 1 && !wifiPhone) {
-                    L.e(TAG, "按键打开无线手机充电");
-                    mSignwayManager.setHighGpio(SignwayManager.ExterGPIOPIN.SWH5528_J9_PIN23);
-                    wifiPhone = true;
-                } else if (state == 0) {
-                    L.e(TAG, "按键关闭无线手机充电");
-                    mSignwayManager.setLowGpio(SignwayManager.ExterGPIOPIN.SWH5528_J9_PIN23);
-                    wifiPhone = false;
-                }
-                phoneHandler.postDelayed(phoneRunnable, 500);
-            }
-        };
-        phoneHandler.post(phoneRunnable);
+//        phoneHandler = new Handler();
+//        phoneRunnable = new Runnable() {
+//            @Override
+//            public void run() {
+//                mSignwayManager.openGpioDevice();
+//                mSignwayManager.setGpioNum(SignwayManager.ExterGPIOPIN.SWH5528_J9_PIN23
+//                        , SignwayManager.GPIOGroup.GPIO0, SignwayManager.GPIONum.PD4);
+//                int state = mSignwayManager.getGpioStatus(SignwayManager.ExterGPIOPIN.SWH5528_J9_PIN23);
+//                if (state == 1 && !wifiPhone) {
+//                    L.e(TAG, "按键打开无线手机充电");
+//                    mSignwayManager.setHighGpio(SignwayManager.ExterGPIOPIN.SWH5528_J9_PIN23);
+//                    wifiPhone = true;
+//                } else if (state == 0) {
+//                    L.e(TAG, "按键关闭无线手机充电");
+//                    mSignwayManager.setLowGpio(SignwayManager.ExterGPIOPIN.SWH5528_J9_PIN23);
+//                    wifiPhone = false;
+//                }
+//                phoneHandler.postDelayed(phoneRunnable, 500);
+//            }
+//        };
+//        phoneHandler.post(phoneRunnable);
 
-        lampHandler = new Handler();
-        lampRunnable = new Runnable() {
-            @Override
-            public void run() {
-                mSignwayManager.openGpioDevice();
-                mSignwayManager.setGpioNum(SignwayManager.ExterGPIOPIN.SWH5528_J9_PIN24
-                        , SignwayManager.GPIOGroup.GPIO0, SignwayManager.GPIONum.PD2);
-                int state = mSignwayManager.getGpioStatus(SignwayManager.ExterGPIOPIN.SWH5528_J9_PIN24);
-                if (state == 1 && !wifiLamp) {
-                    L.e(TAG, "按键打开无线台灯");
-                    mSignwayManager.setHighGpio(SignwayManager.ExterGPIOPIN.SWH5528_J9_PIN24);
-                    wifiLamp = true;
-                } else if (state == 0) {
-                    L.e(TAG, "按键关闭无线台灯");
-                    mSignwayManager.setLowGpio(SignwayManager.ExterGPIOPIN.SWH5528_J9_PIN24);
-                    wifiLamp = false;
-                }
-                lampHandler.postDelayed(lampRunnable, 500);
-            }
-        };
-        lampHandler.post(lampRunnable);
+//        lampHandler = new Handler();
+//        lampRunnable = new Runnable() {
+//            @Override
+//            public void run() {
+//                mSignwayManager.openGpioDevice();
+//                mSignwayManager.setGpioNum(SignwayManager.ExterGPIOPIN.SWH5528_J9_PIN24
+//                        , SignwayManager.GPIOGroup.GPIO0, SignwayManager.GPIONum.PD2);
+//                int state = mSignwayManager.getGpioStatus(SignwayManager.ExterGPIOPIN.SWH5528_J9_PIN24);
+//                if (state == 1 && !wifiLamp) {
+//                    L.e(TAG, "按键打开无线台灯");
+//                    mSignwayManager.setHighGpio(SignwayManager.ExterGPIOPIN.SWH5528_J9_PIN24);
+//                    wifiLamp = true;
+//                } else if (state == 0) {
+//                    L.e(TAG, "按键关闭无线台灯");
+//                    mSignwayManager.setLowGpio(SignwayManager.ExterGPIOPIN.SWH5528_J9_PIN24);
+//                    wifiLamp = false;
+//                }
+//                lampHandler.postDelayed(lampRunnable, 500);
+//            }
+//        };
+//        lampHandler.post(lampRunnable);
     }
 
     private void readDevice() {
         if (fid < 0) {
             return;
         }
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
-                if (!isSet) {
-                    isSet = true;
-                    readLength = mSignwayManager.readUart(fid, rbuf, rbuf.length);
-                    if (readLength > 3) {
-                        setNewData(rbuf, readLength);
-                    }
-                    isSet = false;
-                }
-            }
-        });
+        readLength = mSignwayManager.readUart(fid, rbuf, rbuf.length);
+        L.e(TAG, " readLength  " + readLength);
+        if (readLength > 4) {
+            setNewData(rbuf, readLength);
+        }
     }
 
     private void setNewData(byte[] newData, int readLength) {
@@ -805,31 +905,39 @@ public class ControlService extends AccessibilityService {
                 }
             }
 
-            for (int j = 0; j < 3; j++) {
+            for (int j = 0; j < 5; j++) {
                 sendData[j] = newData[i];
                 i++;
                 if (i > (readLength - 1)) {
-                    return;
+                    break;
                 }
             }
-            L.e(TAG, Arrays.toString(sendData));
+            L.e(TAG, "sendData  sendData   " + Arrays.toString(sendData));
 
-            byte MODE = sendData[1];
+            int MODE = sendData[2];
 
-            if ((MODE & 0xA2) != 0 && !volumeUp) {
-                L.e(TAG, "按键音量增加");
-                volumeUp = true;
-                if (audioManager.getStreamVolume(AudioManager.STREAM_MUSIC) < audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)) {
-                    audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, audioManager.getStreamVolume(AudioManager.STREAM_MUSIC) + 1, 0);
-                }
-            } else if ((MODE & 0xA2) == 0) {
-                volumeUp = false;
-            } else if ((MODE & 0xA3) != 0 && !volumeDown) {
-                L.e(TAG, "按键音量减少");
-                volumeDown = true;
-                audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, audioManager.getStreamVolume(AudioManager.STREAM_MUSIC) - 1, 0);
-            } else if ((MODE & 0xA3) == 0) {
-                volumeDown = false;
+            switch (MODE) {
+                case -92:
+                    L.e(TAG, "按键音量 -92");
+                    break;
+                case -93:
+                    if ((audioManager.getStreamVolume(AudioManager.STREAM_MUSIC) - 3) >= 3) {
+                        audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, audioManager.getStreamVolume(AudioManager.STREAM_MUSIC) - 3, 0);
+                        L.e(TAG, "按键音量减少" + audioManager.getStreamVolume(AudioManager.STREAM_MUSIC));
+                    } else {
+                        audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, 3, 0);
+                        L.e(TAG, "按键音量减少" + audioManager.getStreamVolume(AudioManager.STREAM_MUSIC));
+                    }
+                    break;
+                case -94:
+                    L.e(TAG, "按键音量增加" + audioManager.getStreamVolume(AudioManager.STREAM_MUSIC));
+                    if (audioManager.getStreamVolume(AudioManager.STREAM_MUSIC) < audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)) {
+                        audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, audioManager.getStreamVolume(AudioManager.STREAM_MUSIC) + 3, 0);
+                    }
+                    break;
+                case -95:
+                    L.e(TAG, "按键音量 -95");
+                    break;
             }
         }
     }
@@ -968,5 +1076,33 @@ public class ControlService extends AccessibilityService {
                 }
             }
         });
+    }
+
+//=============================================================  下面是日程提醒调用逻辑  ======================================================================================================
+
+    private class AlarmReceiver extends BroadcastReceiver {
+
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if ("com.zhy.lierdafridge.RING".equals(intent.getAction())) {
+                L.e(TAG, "AlarmReceiver   时间到了  ");
+
+                long time = intent.getLongExtra("time", 0);
+
+                List<RemindBean> remindBeanList = DataSupport.select("msg").where("triggerAtMillis=?", String.valueOf(time)).find(RemindBean.class);
+
+                StringBuffer stringBuffer = new StringBuffer();
+
+                if (remindBeanList.size() > 0) {
+                    for (RemindBean r : remindBeanList) {
+                        stringBuffer = stringBuffer.append(r.getMsg()).append(",");
+                    }
+                    mTts.startSpeaking(stringBuffer.toString(), mTtsListener);
+                    L.e(TAG, "  stringBuffer  " + stringBuffer);
+
+                    DataSupport.deleteAll(RemindBean.class, "triggerAtMillis=?", String.valueOf(time));
+                }
+            }
+        }
     }
 }
