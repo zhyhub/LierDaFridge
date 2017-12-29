@@ -193,7 +193,7 @@ public class ControlService extends AccessibilityService {
                     isPause = true;
                     L.e(TAG, "onKeyEvent  播放睡前故事暂停");
                 }
-                int code = mTts.startSpeaking("你要说什么", mTtsListener);
+                int code = mTts.startSpeaking("你说", mTtsListener);
                 /*
                  * 只保存音频不进行播放接口,调用此接口请注释startSpeaking接口
 		         * text:要合成的文本，uri:需要保存的音频全路径，listener:回调接口
@@ -791,7 +791,7 @@ public class ControlService extends AccessibilityService {
     }
 
     private void TTS(BaseEntity entity) {
-        if (!entity.getText().equals("")) {
+        if (entity.getText() != null && !entity.getText().equals("")) {
             mTts.startSpeaking(entity.getText(), mTtsListener);
         }
     }
@@ -832,7 +832,7 @@ public class ControlService extends AccessibilityService {
         volumeRunnable = new Runnable() {
             @Override
             public void run() {
-                L.e(TAG, "读 音量");
+//                L.e(TAG, "读 音量");
                 readDevice();
                 volumeHandler.postDelayed(volumeRunnable, 100);
             }
@@ -889,7 +889,7 @@ public class ControlService extends AccessibilityService {
             return;
         }
         readLength = mSignwayManager.readUart(fid, rbuf, rbuf.length);
-        L.e(TAG, " readLength  " + readLength);
+//        L.e(TAG, " readLength  " + readLength);
         if (readLength > 4) {
             setNewData(rbuf, readLength);
         }
