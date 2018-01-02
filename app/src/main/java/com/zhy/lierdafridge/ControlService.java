@@ -83,7 +83,6 @@ public class ControlService extends AccessibilityService {
     private static int CurrentTemp = 0;
 
     private SignwayManager mSignwayManager;
-    private int readLength;
     private int fid = -1;
 
     private NetWorkStateReceiver receiver;
@@ -773,6 +772,20 @@ public class ControlService extends AccessibilityService {
                             sendData(new Gson().toJson(zigbeeBean));
                             TTS(entity);
                             break;
+                        case 114://控制电视电源打开
+                            break;
+                        case 115://控制电视电源关闭
+                            break;
+                        case 116://切换上一个电视频道
+                            break;
+                        case 117://切换下一个电视频道
+                            break;
+                        case 118://增加电视音量
+                            break;
+                        case 119://降低电视音量
+                            break;
+                        case 120://电视静音
+                            break;
                     }
                 }
             }
@@ -817,7 +830,6 @@ public class ControlService extends AccessibilityService {
     private Handler lampHandler = null;
     private Runnable lampRunnable = null;
 
-    private boolean isSet = false;
     int MAX_SIZE = 20;
     byte[] rbuf = new byte[MAX_SIZE];
     private byte[] sendData = new byte[5];//读的数据
@@ -888,7 +900,7 @@ public class ControlService extends AccessibilityService {
         if (fid < 0) {
             return;
         }
-        readLength = mSignwayManager.readUart(fid, rbuf, rbuf.length);
+        int readLength = mSignwayManager.readUart(fid, rbuf, rbuf.length);
 //        L.e(TAG, " readLength  " + readLength);
         if (readLength > 4) {
             setNewData(rbuf, readLength);
@@ -1038,7 +1050,7 @@ public class ControlService extends AccessibilityService {
                     OutputStream outputStream = socket.getOutputStream();
                     byte buffer[] = content.getBytes();
                     int temp = buffer.length;
-                    outputStream.write(buffer, 0, buffer.length);
+                    outputStream.write(buffer, 0, temp);
                     outputStream.flush();
                 } catch (IOException | NullPointerException e) {
                     L.e(TAG, e.getMessage() + "    " + e);
