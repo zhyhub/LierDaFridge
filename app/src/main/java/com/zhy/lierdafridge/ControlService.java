@@ -14,6 +14,7 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.Message;
+import android.support.v7.app.AlertDialog;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.view.accessibility.AccessibilityEvent;
@@ -469,7 +470,7 @@ public class ControlService extends AccessibilityService {
         public void onReceive(Context context, Intent intent) {
             L.e("网络状态发生变化");
             if (isWifiConnected(ControlService.this)) {
-                mTts.startSpeaking("网络连接成功了了了了了", mTtsListener);
+                mTts.startSpeaking("网络连接成功", mTtsListener);
             } else {
                 mTts.startSpeaking("网络连接已断开", mTtsListener);
             }
