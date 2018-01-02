@@ -786,6 +786,17 @@ public class ControlService extends AccessibilityService {
                             break;
                         case 120://电视静音
                             break;
+                        case 121://查询设备
+                            zigbeeBean = new ZigbeeBean();
+                            zigbeeBean.setSourceId("009569B4662A");
+                            zigbeeBean.setRequestType("query");
+                            zigbeeBean.setSerialNum(0);
+//                            zigbeeBean.setId("00124B0010027B82");
+                            zigbeeBean.setId("0000000000000000");
+
+                            L.e(TAG, "ZigbeeBean  CurtainsStop " + new Gson().toJson(zigbeeBean));
+                            sendData(new Gson().toJson(zigbeeBean));
+                            break;
                     }
                 }
             }
@@ -972,7 +983,7 @@ public class ControlService extends AccessibilityService {
                         String requestType = "";
                         String id = "";
                         int state = 0;
-                        if ("".equals(response)) {
+                        if (response != null && !"".equals(response)) {
                             try {
                                 JSONObject jsonObject = new JSONObject(response);
                                 if (jsonObject.has("stateCode")) {
@@ -1076,13 +1087,13 @@ public class ControlService extends AccessibilityService {
                     isR = new InputStreamReader(is);
                     br = new BufferedReader(isR);
                     response = br.readLine();
-                    L.d(TAG, "Result: " + response);
-
-                    Message msg = Message.obtain();
-                    msg.what = MSG_SOCKET;
-                    msg.obj = response;
-                    mMainHandler.sendMessage(msg);
-
+                    if (response != null) {
+                        L.d(TAG, "Result: " + response);
+                        Message msg = Message.obtain();
+                        msg.what = MSG_SOCKET;
+                        msg.obj = response;
+                        mMainHandler.sendMessage(msg);
+                    }
                 } catch (IOException | NullPointerException e) {
                     L.e(TAG, "操作失败" + e.getMessage() + "    " + e);
                 }
