@@ -138,6 +138,7 @@ public class ControlService extends AccessibilityService {
                 intent.setAction("smartlink.zhy.jyfridge.RING");
                 intent.putExtra("time", remindBean.getTriggerAtMillis());
                 PendingIntent pendingIntent = PendingIntent.getBroadcast(ControlService.this, requestCode, intent, 0);
+                assert am != null;
                 am.set(AlarmManager.RTC_WAKEUP, remindBean.getTriggerAtMillis(), pendingIntent);
                 requestCode++;
             }
@@ -529,6 +530,7 @@ public class ControlService extends AccessibilityService {
                             intent.setAction("smartlink.zhy.jyfridge.RING");
                             intent.putExtra("time", entity.getTime_start());
                             PendingIntent pendingIntent = PendingIntent.getBroadcast(ControlService.this, requestCode, intent, 0);
+                            assert am != null;
                             am.set(AlarmManager.RTC_WAKEUP, entity.getTime_start(), pendingIntent);
                             requestCode++;
                             if ("".equals(entity.getDetails())) {
