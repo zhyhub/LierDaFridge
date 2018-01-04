@@ -114,7 +114,7 @@ public class ControlService extends AccessibilityService {
     public void onCreate() {
         super.onCreate();
         createSocket();
-        audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+        am = (AlarmManager) ControlService.this.getSystemService(Context.ALARM_SERVICE);
         alarmReceiver = new AlarmReceiver();
         registerReceiver(alarmReceiver, new IntentFilter("com.zhy.lierdafridge.RING"));
 //        // 初始化识别无UI识别对象
@@ -788,15 +788,16 @@ public class ControlService extends AccessibilityService {
                         case 120://电视静音
                             break;
                         case 121://查询设备
-                            zigbeeBean = new ZigbeeBean();
-                            zigbeeBean.setSourceId("009569B4662A");
-                            zigbeeBean.setRequestType("query");
-                            zigbeeBean.setSerialNum(0);
-//                            zigbeeBean.setId("00124B0010027B82");
-                            zigbeeBean.setId("0000000000000000");
-
-                            L.e(TAG, "ZigbeeBean  CurtainsStop " + new Gson().toJson(zigbeeBean));
-                            sendData(new Gson().toJson(zigbeeBean));
+//                            zigbeeBean = new ZigbeeBean();
+//                            zigbeeBean.setSourceId("009569B4662A");
+//                            zigbeeBean.setRequestType("query");
+//                            zigbeeBean.setSerialNum(0);
+////                            zigbeeBean.setId("00124B0010027B82");
+//                            zigbeeBean.setId("0000000000000000");
+//
+//                            L.e(TAG, "ZigbeeBean  CurtainsStop " + new Gson().toJson(zigbeeBean));
+//                            sendData(new Gson().toJson(zigbeeBean));
+                            controlLight();
                             break;
                     }
                 }
@@ -1100,6 +1101,29 @@ public class ControlService extends AccessibilityService {
                 }
             }
         });
+    }
+
+
+    /**
+     * 控制利尔达灯丝灯
+     */
+    private void controlLight(){
+        CurrentTemp = 60;
+        zigbeeBean = new ZigbeeBean();
+        zigbeeBean.setSourceId("009569B4662A");
+        zigbeeBean.setRequestType("cmd");
+        zigbeeBean.setSerialNum(-1);
+        zigbeeBean.setId("00124B0009E9BB48");
+
+        attributesBean = new ZigbeeBean.AttributesBean();
+        attributesBean.setTYP("LT-CTM");
+        attributesBean.setLEV(String.valueOf(20));
+        attributesBean.setSWI("ON");
+
+        zigbeeBean.setAttributes(attributesBean);
+
+        L.e(TAG, "ZigbeeBean  Open " + new Gson().toJson(zigbeeBean));
+        sendData(new Gson().toJson(zigbeeBean));
     }
 
 //=============================================================  下面是日程提醒调用逻辑  ======================================================================================================
