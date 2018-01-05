@@ -1007,9 +1007,6 @@ public class ControlService extends AccessibilityService {
     private void controlLight(boolean isOpen, int temp, boolean MaxOrMin) {
         //00124B0009E9BB48 左床头灯
         //00124B0009E9BCA3 右床头灯
-        List<String> ids = new ArrayList<>();
-        ids.add("00124B0009E9BB48");
-        ids.add("00124B0009E9BCA3");
         isList = true;
         if (isOpen) {
             if (!MaxOrMin) {
