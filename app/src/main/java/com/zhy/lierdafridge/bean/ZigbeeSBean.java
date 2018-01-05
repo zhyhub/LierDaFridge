@@ -7,17 +7,18 @@ import java.util.List;
  */
 
 public class ZigbeeSBean {
+
     private String sourceId;
     private int serialNum;
     private String requestType;
-    private List<String> id;
+    private String id;
     private ZigbeeSBean.AttributesBean attributes;
 
-    public List<String> getId() {
+    public String getId() {
         return id;
     }
 
-    public void setId(List<String> id) {
+    public void setId(String id) {
         this.id = id;
     }
 
@@ -59,6 +60,15 @@ public class ZigbeeSBean {
         private String SWI;
         private String TYP;
         private String WIN;
+        private String GRP;
+
+        public String getGRP() {
+            return GRP;
+        }
+
+        public void setGRP(String GRP) {
+            this.GRP = GRP;
+        }
 
         public String getWIN() {
             return WIN;

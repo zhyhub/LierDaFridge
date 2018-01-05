@@ -710,10 +710,10 @@ public class ControlService extends AccessibilityService {
                             sendData(new Gson().toJson(zigbeeBean));
                             break;
                         case 122://我要睡觉了   关窗帘  关灯
-                            MultipleControl(false,entity);
+                            MultipleControl(false, entity);
                             break;
                         case 123://起床       开灯  开窗帘
-                            MultipleControl(true,entity);
+                            MultipleControl(true, entity);
                             break;
                     }
                 }
@@ -899,7 +899,7 @@ public class ControlService extends AccessibilityService {
                         int state = 0;
                         if (response != null && !"".equals(response)) {
                             L.e(TAG, "操作成功");
-                        }else {
+                        } else {
                             L.e(TAG, "操作失败");
                         }
                         break;
@@ -1001,7 +1001,6 @@ public class ControlService extends AccessibilityService {
         });
     }
 
-
     /**
      * 控制利尔达灯丝灯
      */
@@ -1019,12 +1018,13 @@ public class ControlService extends AccessibilityService {
                     zigbeeSBean.setSourceId("009569B4662A");
                     zigbeeSBean.setRequestType("cmd");
                     zigbeeSBean.setSerialNum(0);
-                    zigbeeSBean.setId(ids);
+                    zigbeeSBean.setId("0000000000000000");
 
                     attributesBeanS = new ZigbeeSBean.AttributesBean();
                     attributesBeanS.setTYP("LT-CTM");
                     attributesBeanS.setLEV(String.valueOf(temp));
                     attributesBeanS.setSWI("ON");
+                    attributesBeanS.setGRP("1");
 
                     zigbeeSBean.setAttributes(attributesBeanS);
 
@@ -1037,17 +1037,18 @@ public class ControlService extends AccessibilityService {
                     mTts.startSpeaking("已经是最大亮度了", mTtsListener);
                     CurrentTemp = 100;
                 }
-            }else {
+            } else {
                 zigbeeSBean = new ZigbeeSBean();
                 zigbeeSBean.setSourceId("009569B4662A");
                 zigbeeSBean.setRequestType("cmd");
                 zigbeeSBean.setSerialNum(0);
-                zigbeeSBean.setId(ids);
+                zigbeeSBean.setId("0000000000000000");
 
                 attributesBeanS = new ZigbeeSBean.AttributesBean();
                 attributesBeanS.setTYP("LT-CTM");
                 attributesBeanS.setLEV(String.valueOf(temp));
                 attributesBeanS.setSWI("ON");
+                attributesBeanS.setGRP("1");
 
                 zigbeeSBean.setAttributes(attributesBeanS);
 
@@ -1059,13 +1060,14 @@ public class ControlService extends AccessibilityService {
             zigbeeSBean.setSourceId("009569B4662A");
             zigbeeSBean.setRequestType("cmd");
             zigbeeSBean.setSerialNum(0);
-            zigbeeSBean.setId(ids);
+            zigbeeSBean.setId("0000000000000000");
 
             attributesBeanS = new ZigbeeSBean.AttributesBean();
 
             attributesBeanS.setLEV(String.valueOf(temp));
             attributesBeanS.setSWI("OFF");
             attributesBeanS.setTYP("LT-CTM");
+            attributesBeanS.setGRP("1");
 
             zigbeeSBean.setAttributes(attributesBeanS);
 
@@ -1074,11 +1076,9 @@ public class ControlService extends AccessibilityService {
         }
     }
 
-    private void MultipleControl(boolean isUpOrDown,BaseEntity entity){
+    private void MultipleControl(boolean isUpOrDown, BaseEntity entity) {
 
-        if(isUpOrDown){
-            CurrentTemp = 60;
-            controlLight(true,CurrentTemp,false);
+        if (isUpOrDown) {
             zigbeeBean = new ZigbeeBean();
             zigbeeBean.setSourceId("009569B4662A");
             zigbeeBean.setRequestType("cmd");
@@ -1092,10 +1092,10 @@ public class ControlService extends AccessibilityService {
             zigbeeBean.setAttributes(attributesBean);
             L.e(TAG, "ZigbeeBean  CurtainsOpen " + new Gson().toJson(zigbeeBean));
             sendData(new Gson().toJson(zigbeeBean));
+            CurrentTemp = 60;
+            controlLight(true, CurrentTemp, false);
             TTS(entity);
-        }else {
-            CurrentTemp = 0;
-            controlLight(false,CurrentTemp,false);
+        } else {
             zigbeeBean = new ZigbeeBean();
             zigbeeBean.setSourceId("009569B4662A");
             zigbeeBean.setRequestType("cmd");
@@ -1109,6 +1109,8 @@ public class ControlService extends AccessibilityService {
             zigbeeBean.setAttributes(attributesBean);
             L.e(TAG, "ZigbeeBean  CurtainsOpen " + new Gson().toJson(zigbeeBean));
             sendData(new Gson().toJson(zigbeeBean));
+            CurrentTemp = 0;
+            controlLight(false, CurrentTemp, false);
             TTS(entity);
         }
     }
