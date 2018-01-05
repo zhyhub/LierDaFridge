@@ -1,26 +1,23 @@
 package com.zhy.lierdafridge.bean;
 
-import android.widget.LinearLayout;
-
 import java.util.List;
 
 /**
- * Created by Administrator on 2017/12/15 0015.
+ * Created by Administrator on 2018/1/5 0005.
  */
 
-public class ZigbeeBean {
-
+public class ZigbeeSBean {
     private String sourceId;
     private int serialNum;
     private String requestType;
-    private String id;
-    private AttributesBean attributes;
+    private List<String> id;
+    private ZigbeeSBean.AttributesBean attributes;
 
-    public String getId() {
+    public List<String> getId() {
         return id;
     }
 
-    public void setId(String id) {
+    public void setId(List<String> id) {
         this.id = id;
     }
 
@@ -48,11 +45,11 @@ public class ZigbeeBean {
         this.requestType = requestType;
     }
 
-    public AttributesBean getAttributes() {
+    public ZigbeeSBean.AttributesBean getAttributes() {
         return attributes;
     }
 
-    public void setAttributes(AttributesBean attributes) {
+    public void setAttributes(ZigbeeSBean.AttributesBean attributes) {
         this.attributes = attributes;
     }
 
