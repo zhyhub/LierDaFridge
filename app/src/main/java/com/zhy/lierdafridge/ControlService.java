@@ -960,14 +960,14 @@ public class ControlService extends AccessibilityService {
                     if (socket == null) {
                         socket = new Socket("192.168.100.1", 8888);
                     }
-                    if(socket.isConnected()){
+                    if (socket.isConnected()) {
                         OutputStream outputStream = socket.getOutputStream();
                         byte buffer[] = content.getBytes();
                         int temp = buffer.length;
                         outputStream.write(buffer, 0, temp);
                         outputStream.flush();
-                    }else {
-                        L.e(TAG,"socket 断开连接");
+                    } else {
+                        L.e(TAG, "socket 断开连接");
                         socket = new Socket("192.168.100.1", 8888);
                         OutputStream outputStream = socket.getOutputStream();
                         byte buffer[] = content.getBytes();
@@ -977,10 +977,25 @@ public class ControlService extends AccessibilityService {
                     }
                 } catch (IOException | NullPointerException e) {
                     L.e(TAG, e.getMessage() + "    " + e);
+                    NewSocket(content);
                 }
             }
         });
         receiveData();
+    }
+
+    private void NewSocket(String content) {
+        try {
+            socket = new Socket("192.168.100.1", 8888);
+            L.e(TAG, "NewSocket   socket 断开连接");
+            OutputStream outputStream = socket.getOutputStream();
+            byte buffer[] = content.getBytes();
+            int temp = buffer.length;
+            outputStream.write(buffer, 0, temp);
+            outputStream.flush();
+        } catch (IOException | NullPointerException e) {
+            e.printStackTrace();
+        }
     }
 
     private void receiveData() {
