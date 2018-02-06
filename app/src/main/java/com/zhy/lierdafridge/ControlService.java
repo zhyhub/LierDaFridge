@@ -520,6 +520,8 @@ public class ControlService extends AccessibilityService {
                             TTS(entity);
                             break;
                         case 3://日程提醒
+                            long againTime = entity.getTime_start() + 300000;
+
                             RemindBean remindBean = new RemindBean();
                             remindBean.setTriggerAtMillis(entity.getTime_start());
                             remindBean.setMsg(entity.getDetails());
@@ -532,13 +534,31 @@ public class ControlService extends AccessibilityService {
                             Intent intent = new Intent();
                             intent.setAction("com.zhy.lierdafridge.RING");
                             intent.putExtra("time", entity.getTime_start());
-                            PendingIntent pi = PendingIntent.getBroadcast(ControlService.this, requestCode, intent, 0);
+                            PendingIntent pi = PendingIntent.getBroadcast(ControlService.this, requestCode, intent, PendingIntent.FLAG_UPDATE_CURRENT);
                             assert alarmManager != null;
                             alarmManager.set(AlarmManager.RTC_WAKEUP, entity.getTime_start(), pi);
                             requestCode++;
                             if (!"".equals(entity.getDetails())) {
                                 TTS(entity);
                             }
+
+                            RemindBean remindBean5 = new RemindBean();
+                            remindBean5.setTriggerAtMillis(againTime);
+                            remindBean5.setMsg(entity.getDetails());
+                            remindBean5.save();
+                            if (remindBean5.save()) {
+                                L.e(TAG, "Connector   存储成功");
+                            } else {
+                                L.e(TAG, "Connector   存储失败");
+                            }
+                            Intent intent5 = new Intent();
+                            intent5.setAction("com.zhy.lierdafridge.RING");
+                            intent5.putExtra("time", againTime);
+                            PendingIntent pi5 = PendingIntent.getBroadcast(ControlService.this, requestCode, intent5, PendingIntent.FLAG_UPDATE_CURRENT);
+                            assert alarmManager != null;
+                            alarmManager.set(AlarmManager.RTC_WAKEUP, againTime, pi5);
+                            requestCode++;
+
                             break;
                         case 4://获取睡前故事url
                             TTS(entity);
