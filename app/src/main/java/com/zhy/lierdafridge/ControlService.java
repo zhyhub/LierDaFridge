@@ -1,6 +1,7 @@
 package com.zhy.lierdafridge;
 
 import android.accessibilityservice.AccessibilityService;
+import android.annotation.SuppressLint;
 import android.app.AlarmManager;
 import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
@@ -14,7 +15,6 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.Message;
-import android.support.v7.app.AlertDialog;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.view.accessibility.AccessibilityEvent;
@@ -50,22 +50,17 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import okhttp3.Call;
-
-/**
- * Created by Administrator on 2017/12/20 0020.
- */
 
 public class ControlService extends AccessibilityService {
 
@@ -78,7 +73,7 @@ public class ControlService extends AccessibilityService {
     // 语音听写对象
     private SpeechRecognizer mIat;
     // 用HashMap存储听写结果
-    private HashMap<String, String> mIatResults = new LinkedHashMap<String, String>();
+    private HashMap<String, String> mIatResults = new LinkedHashMap<>();
     // 引擎类型
     private String mEngineType = SpeechConstant.TYPE_CLOUD;
 
@@ -93,16 +88,16 @@ public class ControlService extends AccessibilityService {
 
     int ret = 0; // 函数调用返回值
     // 缓冲进度
-    private int mPercentForBuffering = 0;
+//    private int mPercentForBuffering = 0;
     // 播放进度
-    private int mPercentForPlaying = 0;
+//    private int mPercentForPlaying = 0;
 
     /**
      * 音量控制
      */
     private AudioManager audioManager;
 
-    AlarmManager am;
+    AlarmManager alarmManager;
     private boolean isPause = false;
 
     private ZigbeeBean zigbeeBean;
@@ -122,9 +117,8 @@ public class ControlService extends AccessibilityService {
     public void onCreate() {
         super.onCreate();
         createSocket();
-        am = (AlarmManager) ControlService.this.getSystemService(Context.ALARM_SERVICE);
-        alarmReceiver = new AlarmReceiver();
-        registerReceiver(alarmReceiver, new IntentFilter("com.zhy.lierdafridge.RING"));
+        alarmManager = (AlarmManager) ControlService.this.getSystemService(Context.ALARM_SERVICE);
+        registerReceiver(new AlarmReceiver(), new IntentFilter("com.zhy.lierdafridge.RING"));
 //        // 初始化识别无UI识别对象
         // 使用SpeechRecognizer对象，可根据回调消息自定义界面；
         mIat = SpeechRecognizer.createRecognizer(ControlService.this, mInitListener);
@@ -143,11 +137,11 @@ public class ControlService extends AccessibilityService {
         if (remindBeanList.size() > 0) {
             for (RemindBean remindBean : remindBeanList) {
                 Intent intent = new Intent();
-                intent.setAction("smartlink.zhy.jyfridge.RING");
+                intent.setAction("com.zhy.lierdafridge.RING");
                 intent.putExtra("time", remindBean.getTriggerAtMillis());
                 PendingIntent pendingIntent = PendingIntent.getBroadcast(ControlService.this, requestCode, intent, 0);
-                assert am != null;
-                am.set(AlarmManager.RTC_WAKEUP, remindBean.getTriggerAtMillis(), pendingIntent);
+                assert alarmManager != null;
+                alarmManager.set(AlarmManager.RTC_WAKEUP, remindBean.getTriggerAtMillis(), pendingIntent);
                 requestCode++;
             }
             L.e(TAG, "还有没有过期的日程提醒");
@@ -313,7 +307,7 @@ public class ControlService extends AccessibilityService {
         public void onBufferProgress(int percent, int beginPos, int endPos,
                                      String info) {
             // 合成进度
-            mPercentForBuffering = percent;
+//            mPercentForBuffering = percent;
 //            showTip(String.format(getString(R.string.tts_toast_format),
 //                    mPercentForBuffering, mPercentForPlaying));
         }
@@ -321,7 +315,7 @@ public class ControlService extends AccessibilityService {
         @Override
         public void onSpeakProgress(int percent, int beginPos, int endPos) {
             // 播放进度
-            mPercentForPlaying = percent;
+//            mPercentForPlaying = percent;
 //            showTip(String.format(getString(R.string.tts_toast_format),
 //                    mPercentForBuffering, mPercentForPlaying));
         }
@@ -536,13 +530,13 @@ public class ControlService extends AccessibilityService {
                                 L.e(TAG, "Connector   存储失败");
                             }
                             Intent intent = new Intent();
-                            intent.setAction("smartlink.zhy.jyfridge.RING");
+                            intent.setAction("com.zhy.lierdafridge.RING");
                             intent.putExtra("time", entity.getTime_start());
-                            PendingIntent pendingIntent = PendingIntent.getBroadcast(ControlService.this, requestCode, intent, 0);
-                            assert am != null;
-                            am.set(AlarmManager.RTC_WAKEUP, entity.getTime_start(), pendingIntent);
+                            PendingIntent pi = PendingIntent.getBroadcast(ControlService.this, requestCode, intent, 0);
+                            assert alarmManager != null;
+                            alarmManager.set(AlarmManager.RTC_WAKEUP, entity.getTime_start(), pi);
                             requestCode++;
-                            if ("".equals(entity.getDetails())) {
+                            if (!"".equals(entity.getDetails())) {
                                 TTS(entity);
                             }
                             break;
@@ -775,56 +769,11 @@ public class ControlService extends AccessibilityService {
         volumeRunnable = new Runnable() {
             @Override
             public void run() {
-//                L.e(TAG, "读 音量");
                 readDevice();
                 volumeHandler.postDelayed(volumeRunnable, 100);
             }
         };
         volumeHandler.post(volumeRunnable);
-
-//        phoneHandler = new Handler();
-//        phoneRunnable = new Runnable() {
-//            @Override
-//            public void run() {
-//                mSignwayManager.openGpioDevice();
-//                mSignwayManager.setGpioNum(SignwayManager.ExterGPIOPIN.SWH5528_J9_PIN23
-//                        , SignwayManager.GPIOGroup.GPIO0, SignwayManager.GPIONum.PD4);
-//                int state = mSignwayManager.getGpioStatus(SignwayManager.ExterGPIOPIN.SWH5528_J9_PIN23);
-//                if (state == 1 && !wifiPhone) {
-//                    L.e(TAG, "按键打开无线手机充电");
-//                    mSignwayManager.setHighGpio(SignwayManager.ExterGPIOPIN.SWH5528_J9_PIN23);
-//                    wifiPhone = true;
-//                } else if (state == 0) {
-//                    L.e(TAG, "按键关闭无线手机充电");
-//                    mSignwayManager.setLowGpio(SignwayManager.ExterGPIOPIN.SWH5528_J9_PIN23);
-//                    wifiPhone = false;
-//                }
-//                phoneHandler.postDelayed(phoneRunnable, 500);
-//            }
-//        };
-//        phoneHandler.post(phoneRunnable);
-
-//        lampHandler = new Handler();
-//        lampRunnable = new Runnable() {
-//            @Override
-//            public void run() {
-//                mSignwayManager.openGpioDevice();
-//                mSignwayManager.setGpioNum(SignwayManager.ExterGPIOPIN.SWH5528_J9_PIN24
-//                        , SignwayManager.GPIOGroup.GPIO0, SignwayManager.GPIONum.PD2);
-//                int state = mSignwayManager.getGpioStatus(SignwayManager.ExterGPIOPIN.SWH5528_J9_PIN24);
-//                if (state == 1 && !wifiLamp) {
-//                    L.e(TAG, "按键打开无线台灯");
-//                    mSignwayManager.setHighGpio(SignwayManager.ExterGPIOPIN.SWH5528_J9_PIN24);
-//                    wifiLamp = true;
-//                } else if (state == 0) {
-//                    L.e(TAG, "按键关闭无线台灯");
-//                    mSignwayManager.setLowGpio(SignwayManager.ExterGPIOPIN.SWH5528_J9_PIN24);
-//                    wifiLamp = false;
-//                }
-//                lampHandler.postDelayed(lampRunnable, 500);
-//            }
-//        };
-//        lampHandler.post(lampRunnable);
     }
 
     private void readDevice() {
@@ -832,7 +781,6 @@ public class ControlService extends AccessibilityService {
             return;
         }
         int readLength = mSignwayManager.readUart(fid, rbuf, rbuf.length);
-//        L.e(TAG, " readLength  " + readLength);
         if (readLength > 4) {
             setNewData(rbuf, readLength);
         }
@@ -885,6 +833,7 @@ public class ControlService extends AccessibilityService {
         }
     }
 
+    @SuppressLint("HandlerLeak")
     protected void createSocket() {
         L.e(TAG, "createSocket() called with: ip = [" + "192.168.100.1" + "], port = [" + 8888 + "]");
 
@@ -1146,7 +1095,7 @@ public class ControlService extends AccessibilityService {
         @Override
         public void onReceive(Context context, Intent intent) {
             if ("com.zhy.lierdafridge.RING".equals(intent.getAction())) {
-                L.e(TAG, "AlarmReceiver   时间到了  ");
+                L.e(TAG, "AlarmReceiver   onReceive 时间到了  ");
 
                 long time = intent.getLongExtra("time", 0);
 
@@ -1159,7 +1108,6 @@ public class ControlService extends AccessibilityService {
                         stringBuffer = stringBuffer.append(r.getMsg()).append(",");
                     }
                     mTts.startSpeaking(stringBuffer.toString(), mTtsListener);
-                    L.e(TAG, "  stringBuffer  " + stringBuffer);
 
                     DataSupport.deleteAll(RemindBean.class, "triggerAtMillis=?", String.valueOf(time));
                 }
